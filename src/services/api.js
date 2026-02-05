@@ -45,6 +45,32 @@ export async function startInterview({ userId, name, category, module }) {
 }
 
 /**
+ * Submit interview result when call ends (frontend-driven evaluation for web-based VAPI agents).
+ * @param {Object} params
+ * @param {string} params.callId - Client-generated UUID for this call
+ * @param {string} params.userId - User identifier (from assistant metadata)
+ * @param {string} params.category - Knowledge category
+ * @param {string|number} params.module - Module identifier
+ * @param {string} [params.transcript] - Full transcript text (e.g. "Assistant: ...\nUser: ...")
+ * @param {string} [params.endedReason] - Why the call ended (from VAPI call-end)
+ * @returns {Promise<{ score: number, summary: string }>}
+ */
+export async function submitInterviewResult({ callId, userId, category, module, transcript, endedReason }) {
+  const response = await fetch(`${API_BASE}/interview/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callId, userId, category, module, transcript: transcript || '', endedReason }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `HTTP ${response.status}: Failed to submit interview result`);
+  }
+
+  return response.json();
+}
+
+/**
  * Generate a unique user ID
  * @returns {string}
  */
@@ -54,5 +80,6 @@ export function generateUserId() {
 
 export default {
   startInterview,
+  submitInterviewResult,
   generateUserId,
 };

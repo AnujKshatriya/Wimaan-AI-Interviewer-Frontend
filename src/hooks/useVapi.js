@@ -1,9 +1,11 @@
 /**
  * Custom hook for VAPI SDK integration
- * Manages call state, transcripts, and VAPI events
+ * Manages call state, transcripts, and VAPI events.
+ * When call ends, submits transcript to backend for evaluation (web-based agents have no webhook).
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Vapi from '@vapi-ai/web';
+import { submitInterviewResult } from '../services/api.js';
 
 const VAPI_PUBLIC_KEY = import.meta.env.VITE_VAPI_PUBLIC_KEY;
 
@@ -22,6 +24,15 @@ export const Speaker = {
   ASSISTANT: 'assistant',
 };
 
+/** Build a single transcript string from entries for backend evaluation. */
+function buildTranscriptString(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return '';
+  return entries
+    .filter((e) => e?.text?.trim())
+    .map((e) => (e.speaker === Speaker.ASSISTANT ? `Assistant: ${e.text}` : `User: ${e.text}`))
+    .join('\n');
+}
+
 export function useVapi() {
   const vapiRef = useRef(null);
   const [status, setStatus] = useState(CallStatus.IDLE);
@@ -30,10 +41,60 @@ export function useVapi() {
   const [transcript, setTranscript] = useState([]); // Array of { speaker, text, timestamp }
   const [error, setError] = useState(null);
   const [callDuration, setCallDuration] = useState(0);
-  const [finalResult, setFinalResult] = useState(null); // Score and summary from tool call
+  const [finalResult, setFinalResult] = useState(null); // Score and summary (from submit or legacy tool call)
   const [endReason, setEndReason] = useState(null); // Why the call ended
   const timerRef = useRef(null);
-  const hasReceivedScoreRef = useRef(false); // Track if we got score before call-end
+  const hasReceivedScoreRef = useRef(false); // Track if we got score before call-end (legacy)
+  const callIdRef = useRef(null);
+  const metadataRef = useRef({});
+  const transcriptRef = useRef([]);
+  const submittedRef = useRef(false);
+
+  // Keep transcriptRef in sync so we read latest transcript when call ends
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+
+  // When call has ended, submit transcript to backend for evaluation (once per call)
+  useEffect(() => {
+    if (status !== CallStatus.ENDED || submittedRef.current) return;
+
+    const timeoutId = setTimeout(async () => {
+      const callId = callIdRef.current;
+      const meta = metadataRef.current;
+      if (!callId || !meta.userId) {
+        return;
+      }
+      submittedRef.current = true;
+
+      const transcriptText = buildTranscriptString(transcriptRef.current);
+      try {
+        const result = await submitInterviewResult({
+          callId,
+          userId: meta.userId,
+          category: meta.category ?? '',
+          module: meta.module ?? '',
+          transcript: transcriptText,
+          endedReason: endReason || undefined,
+        });
+        setFinalResult({
+          score: result.score ?? 0,
+          summary: result.summary ?? 'Interview evaluated.',
+          userId: meta.userId,
+        });
+      } catch (err) {
+        console.error('[useVapi] Submit interview result failed:', err);
+        setError(err.message || 'Evaluation failed');
+        setFinalResult({
+          score: 0,
+          summary: 'Evaluation could not be completed. Please try again.',
+          userId: meta.userId,
+        });
+      }
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [status, endReason]);
 
   // Initialize VAPI client
   useEffect(() => {
@@ -196,6 +257,10 @@ export function useVapi() {
       setError(null);
       setEndReason(null);
       hasReceivedScoreRef.current = false;
+      submittedRef.current = false;
+
+      callIdRef.current = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `call_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      metadataRef.current = assistantConfig?.metadata || {};
 
       console.log('[useVapi] Calling vapi.start() with config...');
       console.log('[useVapi] Assistant config preview:', {
