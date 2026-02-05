@@ -62,7 +62,7 @@ export function useVapi() {
     const timeoutId = setTimeout(async () => {
       const callId = callIdRef.current;
       const meta = metadataRef.current;
-      if (!callId || !meta.userId) {
+      if (!callId || !meta.phone) {
         return;
       }
       submittedRef.current = true;
@@ -71,7 +71,8 @@ export function useVapi() {
       try {
         const result = await submitInterviewResult({
           callId,
-          userId: meta.userId,
+          name: meta.name ?? '',
+          phone: meta.phone ?? '',
           category: meta.category ?? '',
           module: meta.module ?? '',
           transcript: transcriptText,
@@ -80,7 +81,7 @@ export function useVapi() {
         setFinalResult({
           score: result.score ?? 0,
           summary: result.summary ?? 'Interview evaluated.',
-          userId: meta.userId,
+          userId: meta.phone,
         });
       } catch (err) {
         console.error('[useVapi] Submit interview result failed:', err);
@@ -88,7 +89,7 @@ export function useVapi() {
         setFinalResult({
           score: 0,
           summary: 'Evaluation could not be completed. Please try again.',
-          userId: meta.userId,
+          userId: meta.phone,
         });
       }
     }, 400);

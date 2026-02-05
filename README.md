@@ -82,6 +82,16 @@ Create a `.env` in the frontend root (or use `.env.local`). Vite exposes only va
 
 ---
 
+## Configuration
+
+**Modules (e.g. Module 1, Module 2)**  
+Edit the `MODULES` array in [src/components/SetupForm.jsx](src/components/SetupForm.jsx). Add entries like `{ value: '2', label: 'Module 2' }`. After adding a module, run knowledge ingestion for that module in the backend (e.g. `backend/ingestion.ipynb`) so the interviewer has content for it.
+
+**Category URL slugs (e.g. /call-center, /sales)**  
+Edit `CATEGORY_SLUG_MAP` in [src/components/InterviewFlow.jsx](src/components/InterviewFlow.jsx). Keys are the URL path (e.g. `'call-center'` → `/call-center`); values are the backend category id (e.g. `'call_center'`). To add a category: add a new key-value pair. To remove: delete the line. Invalid slugs redirect to `/call-center`. Current slugs: `call-center`, `sales`, `support`.
+
+---
+
 ## Running locally
 
 1. Install dependencies: `npm install`

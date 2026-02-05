@@ -1,10 +1,40 @@
 @import "tailwindcss";
 
+@theme {
+  --color-wimaan-dark: #0a0f1a;
+  --color-wimaan-dark-card: #0f172a;
+  --color-wimaan-accent: #3b82f6;
+  --color-wimaan-accent-hover: #2563eb;
+  --color-wimaan-muted: #94a3b8;
+  --color-wimaan-border: rgba(255, 255, 255, 0.1);
+  /* Light theme overrides applied when .dark is not on html */
+}
+:root {
+  --wimaan-bg: #0a0f1a;
+  --wimaan-bg-card: #0f172a;
+  --wimaan-accent: #3b82f6;
+  --wimaan-accent-hover: #2563eb;
+  --wimaan-text: #f8fafc;
+  --wimaan-muted: #94a3b8;
+  --wimaan-border: rgba(255, 255, 255, 0.1);
+}
+html:not(.dark) {
+  --wimaan-bg: #f1f5f9;
+  --wimaan-bg-card: #ffffff;
+  --wimaan-accent: #3b82f6;
+  --wimaan-accent-hover: #2563eb;
+  --wimaan-text: #0f172a;
+  --wimaan-muted: #64748b;
+  --wimaan-border: rgba(0, 0, 0, 0.1);
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--wimaan-bg);
+  color: var(--wimaan-text);
 }
 
 * {
