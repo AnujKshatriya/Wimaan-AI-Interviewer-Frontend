@@ -25,10 +25,11 @@ export function SetupForm({ jdId, category, onStart, isLoading }) {
   const validate = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = 'Name is required';
-    if (!formData.phone.trim()) {
+    const phoneTrimmed = formData.phone.trim();
+    if (!phoneTrimmed) {
       newErrors.phone = 'Phone number is required';
-    } else if (!/^[+]?[\d\s-]{10,}$/.test(formData.phone.replace(/\s/g, ''))) {
-      newErrors.phone = 'Enter a valid phone number';
+    } else if (!/^\d{10}$/.test(phoneTrimmed)) {
+      newErrors.phone = 'Enter a valid 10-digit Indian mobile number (e.g. 9876543210). No +91, no spaces before or after.';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -37,7 +38,8 @@ export function SetupForm({ jdId, category, onStart, isLoading }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validate()) return;
-    onStart({ ...formData });
+    const payload = { ...formData, phone: formData.phone.trim() };
+    onStart(payload);
   };
 
   return (
@@ -88,7 +90,7 @@ export function SetupForm({ jdId, category, onStart, isLoading }) {
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  placeholder="e.g. +91 98765 43210"
+                  placeholder="e.g. 987xxxx210"
                   className={`w-full px-4 py-3 bg-[var(--wimaan-bg)] border rounded-lg text-[var(--wimaan-text)] placeholder-[var(--wimaan-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--wimaan-accent)] transition ${
                     errors.phone ? 'border-red-500' : 'border-[var(--wimaan-border)]'
                   }`}
