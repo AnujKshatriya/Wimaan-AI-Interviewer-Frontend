@@ -1,17 +1,14 @@
 /**
  * Interview Setup Form Component
- * Collects name, phone, and module. Category comes from route (props).
- *
- * To add more modules later: add entries to the MODULES array below,
- * then run knowledge ingestion for that module in backend/ingestion.ipynb.
+ * Collects name, phone, and module (when category present).
+ * Context (jd_id, category) comes from URL.
  */
 import { useState } from 'react';
 import { AppHeader } from './AppHeader';
 
-// Add more modules here when ingested (e.g. { value: '2', label: 'Module 2' }).
 const MODULES = [{ value: '1', label: 'Module 1' }];
 
-export function SetupForm({ category, onStart, isLoading }) {
+export function SetupForm({ jdId, category, onStart, isLoading }) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -22,16 +19,12 @@ export function SetupForm({ category, onStart, isLoading }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: null }));
-    }
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
   };
 
   const validate = () => {
     const newErrors = {};
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
+    if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
     } else if (!/^[+]?[\d\s-]{10,}$/.test(formData.phone.replace(/\s/g, ''))) {
@@ -44,13 +37,7 @@ export function SetupForm({ category, onStart, isLoading }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!validate()) return;
-
-    onStart({
-      name: formData.name.trim(),
-      phone: formData.phone.trim(),
-      category,
-      module: formData.module,
-    });
+    onStart({ ...formData });
   };
 
   return (
@@ -61,6 +48,11 @@ export function SetupForm({ category, onStart, isLoading }) {
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-[var(--wimaan-text)] mb-2">Wimaan AI</h1>
             <p className="text-[var(--wimaan-muted)]">Voice Interview Assessment</p>
+            {(jdId || category) && (
+              <p className="mt-2 text-xs text-[var(--wimaan-muted)]">
+                {jdId && category ? `JD: ${jdId} + ${category}` : jdId ? `JD: ${jdId}` : `Category: ${category}`}
+              </p>
+            )}
           </div>
 
           <div className="bg-[var(--wimaan-bg-card)] backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-[var(--wimaan-border)]">
@@ -105,25 +97,27 @@ export function SetupForm({ category, onStart, isLoading }) {
                 {errors.phone && <p className="mt-1 text-sm text-red-400">{errors.phone}</p>}
               </div>
 
-              <div>
-                <label htmlFor="module" className="block text-sm font-medium text-[var(--wimaan-muted)] mb-2">
-                  Module
-                </label>
-                <select
-                  id="module"
-                  name="module"
-                  value={formData.module}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-[var(--wimaan-bg)] border border-[var(--wimaan-border)] rounded-lg text-[var(--wimaan-text)] focus:outline-none focus:ring-2 focus:ring-[var(--wimaan-accent)] transition appearance-none cursor-pointer"
-                  disabled={isLoading}
-                >
-                  {MODULES.map((mod) => (
-                    <option key={mod.value} value={mod.value}>
-                      {mod.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {category && (
+                <div>
+                  <label htmlFor="module" className="block text-sm font-medium text-[var(--wimaan-muted)] mb-2">
+                    Module
+                  </label>
+                  <select
+                    id="module"
+                    name="module"
+                    value={formData.module}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-[var(--wimaan-bg)] border border-[var(--wimaan-border)] rounded-lg text-[var(--wimaan-text)] focus:outline-none focus:ring-2 focus:ring-[var(--wimaan-accent)] transition appearance-none cursor-pointer"
+                    disabled={isLoading}
+                  >
+                    {MODULES.map((mod) => (
+                      <option key={mod.value} value={mod.value}>
+                        {mod.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <button
                 type="submit"

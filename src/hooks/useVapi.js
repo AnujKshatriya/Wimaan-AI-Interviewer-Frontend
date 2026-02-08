@@ -75,6 +75,7 @@ export function useVapi() {
           phone: meta.phone ?? '',
           category: meta.category ?? '',
           module: meta.module ?? '',
+          jd_id: meta.jdId || undefined,
           transcript: transcriptText,
           endedReason: endReason || undefined,
         });
@@ -122,7 +123,7 @@ export function useVapi() {
       }, 1000);
     });
 
-    vapi.on('call-end', (endData) => {
+    vapi.on('call-end', (endData) => { 
       console.log('[useVapi] EVENT: call-end - Call ended', endData);
       
       if (timerRef.current) {

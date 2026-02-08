@@ -1,19 +1,15 @@
 /**
- * Interview flow for a given category (from URL). Renders SetupForm or InterviewRoom.
+ * Interview flow: context from URL (jdId and/or category).
+ * Wimaan main platform redirects here with the appropriate path.
  */
-import { useState, useCallback } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useState, useCallback, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import { SetupForm } from './SetupForm';
 import { InterviewRoom } from './InterviewRoom';
+import PageNotFound from './PageNotFound';
 import { useVapi, CallStatus } from '../hooks/useVapi';
 import { startInterview } from '../services/api';
 
-/**
- * Category URL slugs → backend category IDs.
- * - To add a category: add a new key (URL path, e.g. 'retail') and value (backend id, e.g. 'retail').
- * - To remove: delete the line; invalid slugs redirect to /call-center.
- * Current: /call-center, /sales, /support
- */
 const CATEGORY_SLUG_MAP = {
   'call-center': 'call_center',
   sales: 'sales',
@@ -23,10 +19,27 @@ const CATEGORY_SLUG_MAP = {
 
 const Screen = { SETUP: 'setup', INTERVIEW: 'interview' };
 
-function InterviewFlow() {
-  const { categorySlug } = useParams();
+/** Determine case from URL params */
+function useInterviewContext() {
+  const params = useParams();
+  const { jdId, categorySlug } = params;
   const category = categorySlug ? CATEGORY_SLUG_MAP[categorySlug] : null;
-  console.log('category', category);
+
+  return useMemo(() => {
+    const hasJd = !!jdId?.trim();
+    const hasCategory = !!category?.trim();
+    let caseNum;
+    if (hasJd && hasCategory) caseNum = 3;
+    else if (hasJd) caseNum = 2;
+    else if (hasCategory) caseNum = 1;
+    else caseNum = null;
+
+    return { jdId: hasJd ? jdId : null, category, caseNum, categorySlug };
+  }, [jdId, category, categorySlug]);
+}
+
+function InterviewFlow() {
+  const { jdId, category, caseNum, categorySlug } = useInterviewContext();
 
   const [screen, setScreen] = useState(Screen.SETUP);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,27 +59,53 @@ function InterviewFlow() {
     toggleMute,
   } = useVapi();
 
+  // Show 404 for invalid/unknown routes (avoids redirect which caused blank screen)
+  if (!jdId && !category) {
+    return <PageNotFound />;
+  }
   if (categorySlug && !category) {
-    return <Navigate to="/call-center" replace />;
+    return <PageNotFound />;
   }
 
   const handleStart = useCallback(
     async (formData) => {
       setIsLoading(true);
       setApiError(null);
+
+      const payload = {
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+      };
+      if (jdId) payload.jd_id = jdId;
+      if (category) {
+        payload.category = category;
+        payload.module = formData.module || '1';
+      } else {
+        payload.category = '';
+        payload.module = '';
+      }
+
+      console.log('[FRONTEND] Start interview — Case', caseNum, {
+        case: caseNum === 1 ? 'category+module only' : caseNum === 2 ? 'JD only' : 'JD + category+module',
+        jd_id: jdId || '(none)',
+        category: category || '(none)',
+        module: payload.module || '(none)',
+        name: payload.name,
+      });
+
       try {
-        const assistantConfig = await startInterview(formData);
-        setCandidateInfo(formData);
+        const assistantConfig = await startInterview(payload);
+        setCandidateInfo(payload);
         setScreen(Screen.INTERVIEW);
         await startCall(assistantConfig);
       } catch (err) {
-        console.error('Failed to start interview:', err);
+        console.error('[FRONTEND] Failed to start interview:', err);
         setApiError(err.message);
       } finally {
         setIsLoading(false);
       }
     },
-    [startCall]
+    [jdId, category, caseNum, startCall]
   );
 
   const handleEndCall = useCallback(() => stopCall(), [stopCall]);
@@ -99,7 +138,8 @@ function InterviewFlow() {
   return (
     <div>
       <SetupForm
-        category={category || 'call_center'}
+        jdId={jdId}
+        category={category}
         onStart={handleStart}
         isLoading={isLoading}
       />

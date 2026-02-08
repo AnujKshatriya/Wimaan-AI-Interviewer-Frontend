@@ -11,18 +11,24 @@ console.log('[API] Base URL:', API_BASE);
  * @param {Object} params
  * @param {string} params.name - Candidate name
  * @param {string} params.phone - Phone number
- * @param {string} params.category - Knowledge category (from route, e.g. "call_center")
- * @param {string} params.module - Module (default "1")
+ * @param {string} [params.category] - Knowledge category (when using module)
+ * @param {string} [params.module] - Module (when using category/module)
+ * @param {string} [params.jd_id] - Job description ID (optional; use JD-only or JD+module)
  * @returns {Promise<Object>} - VAPI assistant configuration
  */
-export async function startInterview({ name, phone, category, module }) {
-  console.log('[API] Starting interview with params:', { name, phone, category, module });
+export async function startInterview({ name, phone, category, module, jd_id }) {
+  const body = { name, phone };
+  if (category != null) body.category = category;
+  if (module != null) body.module = module;
+  if (jd_id) body.jd_id = jd_id;
+
+  console.log('[API] Starting interview with params:', body);
   console.log('[API] POST', `${API_BASE}/interview/start`);
 
   const response = await fetch(`${API_BASE}/interview/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, phone, category, module }),
+    body: JSON.stringify(body),
   });
 
   console.log('[API] Response status:', response.status);
@@ -48,25 +54,29 @@ export async function startInterview({ name, phone, category, module }) {
  * @param {string} params.callId - Client-generated UUID for this call
  * @param {string} params.name - Candidate name (from assistant metadata)
  * @param {string} params.phone - Phone number (from assistant metadata)
- * @param {string} params.category - Knowledge category
- * @param {string|number} params.module - Module identifier
+ * @param {string} [params.category] - Knowledge category
+ * @param {string|number} [params.module] - Module identifier
+ * @param {string} [params.jd_id] - Job description ID (when JD was used)
  * @param {string} [params.transcript] - Full transcript text
  * @param {string} [params.endedReason] - Why the call ended
  * @returns {Promise<{ score: number, summary: string }>}
  */
-export async function submitInterviewResult({ callId, name, phone, category, module, transcript, endedReason }) {
+export async function submitInterviewResult({ callId, name, phone, category, module, jd_id, transcript, endedReason }) {
+  const body = {
+    callId,
+    name: name || '',
+    phone: phone || '',
+    transcript: transcript || '',
+    endedReason,
+  };
+  if (category != null) body.category = category;
+  if (module != null) body.module = module;
+  if (jd_id) body.jd_id = jd_id;
+
   const response = await fetch(`${API_BASE}/interview/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      callId,
-      name: name || '',
-      phone: phone || '',
-      category,
-      module,
-      transcript: transcript || '',
-      endedReason,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

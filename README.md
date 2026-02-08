@@ -1,6 +1,18 @@
 # Wimaan AI Voice Interview — Frontend
 
-React app for conducting AI voice interviews. The user enters their name and selects a category/module, starts a call via the **VAPI** web SDK, speaks with an AI interviewer, and when the call ends the app submits the transcript to the backend for scoring and shows the result.
+React app for conducting AI voice interviews. The **Wimaan main platform** redirects users here with a URL that encodes the interview context (JD only, category only, or both). The user enters name and phone, optionally selects a module when category is present, starts a call via the **VAPI** web SDK, and when the call ends the app submits the transcript to the backend for scoring and shows the result.
+
+## URL-based routing
+
+Context is driven by the URL (Wimaan main platform controls redirects):
+
+| URL pattern | Case | Context |
+|-------------|------|---------|
+| `/jd/:jdId` | 2 | JD only (e.g. `/jd/senior-customer-support`) |
+| `/:categorySlug` | 1 | Category + module (e.g. `/call-center`) |
+| `/jd/:jdId/:categorySlug` | 3 | JD + category + module (e.g. `/jd/senior-support/call-center`) |
+
+Examples: `https://app.example.com/jd/senior-support`, `https://app.example.com/call-center`, `https://app.example.com/jd/senior-support/call-center`.
 
 ---
 
@@ -37,7 +49,7 @@ frontend/
 |---------------|--------|
 | **main.jsx** | Boots the app: loads `index.css`, renders `<App />` in strict mode. |
 | **App.jsx** | Holds screen state (Setup vs Interview). Calls `startInterview(formData)` to get VAPI config, then `startCall(assistantConfig)`. Passes VAPI state (status, transcript, finalResult, etc.) and handlers (end call, leave) to `InterviewRoom` or shows `SetupForm`. Shows API errors in a toast. |
-| **SetupForm.jsx** | Collects name, category, module. Validates, generates `userId` via `generateUserId()`, calls `onStart({ userId, name, category, module })`. |
+| **SetupForm.jsx** | Collects name, phone, and module (when category present). Context (jd_id, category) comes from URL. Calls `onStart({ name, phone, category?, module?, jd_id? })`. |
 | **InterviewRoom.jsx** | During call: top bar (duration, mute, end call, leave), main area, and `TranscriptPanel`. When call ended and `finalResult` exists: shows score (0–100), summary, and “Start New Interview”. When ended without result: shows “Interview Ended” and “Return to Home”. |
 | **TranscriptPanel.jsx** | Renders the `transcript` array as chat bubbles (Assistant left, User right). Auto-scrolls to bottom when transcript updates. |
 | **useVapi.js** | Custom hook that wraps the VAPI web SDK. Creates the VAPI client once, subscribes to `call-start`, `call-end`, `message` (transcript), `speech-start/end`, `error`. On start: generates `callId`, stores `assistantConfig.metadata` in refs, clears transcript. On each `message` with `type: 'transcript'`: appends to `transcript` state (and keeps a ref in sync). On `call-end`: sets status to ENDED; a `useEffect` then (after 400 ms) builds a single transcript string, calls `submitInterviewResult()` with `callId`, metadata, transcript, and sets `finalResult` from the response. Exposes: `status`, `transcript`, `finalResult`, `startCall`, `stopCall`, `toggleMute`, etc. |
@@ -88,7 +100,10 @@ Create a `.env` in the frontend root (or use `.env.local`). Vite exposes only va
 Edit the `MODULES` array in [src/components/SetupForm.jsx](src/components/SetupForm.jsx). Add entries like `{ value: '2', label: 'Module 2' }`. After adding a module, run knowledge ingestion for that module in the backend (e.g. `backend/ingestion.ipynb`) so the interviewer has content for it.
 
 **Category URL slugs (e.g. /call-center, /sales)**  
-Edit `CATEGORY_SLUG_MAP` in [src/components/InterviewFlow.jsx](src/components/InterviewFlow.jsx). Keys are the URL path (e.g. `'call-center'` → `/call-center`); values are the backend category id (e.g. `'call_center'`). To add a category: add a new key-value pair. To remove: delete the line. Invalid slugs redirect to `/call-center`. Current slugs: `call-center`, `sales`, `support`.
+Edit `CATEGORY_SLUG_MAP` in [src/components/InterviewFlow.jsx](src/components/InterviewFlow.jsx). Keys are the URL path; values are the backend category id. Invalid slugs redirect to `/call-center`. Current slugs: `call-center`, `sales`, `support`.
+
+**Logging**  
+Frontend logs which case is handled and params when starting: `[FRONTEND] Start interview — Case N { case, jd_id, category, module }`.
 
 ---
 
@@ -98,7 +113,7 @@ Edit `CATEGORY_SLUG_MAP` in [src/components/InterviewFlow.jsx](src/components/In
 2. Set `VITE_VAPI_PUBLIC_KEY` in `.env` (and optionally `VITE_API_URL` if the backend is not on port 3000).
 3. Start the backend (see backend README) so `POST /interview/start` and `POST /interview/submit` are available.
 4. Start the frontend: `npm run dev` — app is at `http://localhost:5173`.
-5. Use “Start Your Interview” with name, category, and module. After the call ends, you should see the score and summary from the backend.
+5. Use “Start Your Interview” with name and phone. After the call ends, you should see the score and summary from the backend.
 
 Build for production: `npm run build`. Preview build: `npm run preview`.
 
