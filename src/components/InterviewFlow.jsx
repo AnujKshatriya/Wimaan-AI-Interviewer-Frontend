@@ -1,5 +1,6 @@
 /**
- * Interview flow: context from URL (jdId and/or category).
+ * Interview flow: context from URL (jobId and/or category).
+ * jobId format: companyname_jobrole (e.g. krishna_maruti_limited_operating_engineer_trainee)
  * Wimaan main platform redirects here with the appropriate path.
  */
 import { useState, useCallback, useMemo } from 'react';
@@ -22,11 +23,11 @@ const Screen = { SETUP: 'setup', INTERVIEW: 'interview' };
 /** Determine case from URL params */
 function useInterviewContext() {
   const params = useParams();
-  const { jdId, categorySlug } = params;
+  const { jobId, categorySlug } = params;  // jobId is companyname_jobrole format
   const category = categorySlug ? CATEGORY_SLUG_MAP[categorySlug] : null;
 
   return useMemo(() => {
-    const hasJd = !!jdId?.trim();
+    const hasJd = !!jobId?.trim();
     const hasCategory = !!category?.trim();
     let caseNum;
     if (hasJd && hasCategory) caseNum = 3;
@@ -34,8 +35,8 @@ function useInterviewContext() {
     else if (hasCategory) caseNum = 1;
     else caseNum = null;
 
-    return { jdId: hasJd ? jdId : null, category, caseNum, categorySlug };
-  }, [jdId, category, categorySlug]);
+    return { jdId: hasJd ? jobId : null, category, caseNum, categorySlug };
+  }, [jobId, category, categorySlug]);
 }
 
 function InterviewFlow() {
