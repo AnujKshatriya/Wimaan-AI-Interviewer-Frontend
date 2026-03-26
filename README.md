@@ -8,11 +8,19 @@ Context is driven by the URL (Wimaan main platform controls redirects):
 
 | URL pattern | Case | Context |
 |-------------|------|---------|
-| `/jd/:jdId` | 2 | JD only (e.g. `/jd/senior-customer-support`) |
+| `/job_role/:jobId` | 2 | JD only (e.g. `/job_role/krishna_maruti_limited_operating_engineer_trainee`) |
 | `/:categorySlug` | 1 | Category + module (e.g. `/call-center`) |
-| `/jd/:jdId/:categorySlug` | 3 | JD + category + module (e.g. `/jd/senior-support/call-center`) |
+| `/job_role/:jobId/:categorySlug` | 3 | JD + category + module (e.g. `/job_role/krishna_maruti_limited_operating_engineer_trainee/call-center`) |
 
-Examples: `https://app.example.com/jd/senior-support`, `https://app.example.com/call-center`, `https://app.example.com/jd/senior-support/call-center`.
+Examples: `https://app.example.com/job_role/some_job_id`, `https://app.example.com/call-center`, `https://app.example.com/job_role/some_job_id/call-center`.
+
+### Embedded auto-start (mobile WebView)
+
+For the mobile app skip-login flow, the backend returns a `launchUrl` pointing to:
+
+`/embed?st=<jwt>&sid=<sid>&exp=<epochSeconds>&sig=<hmac>`
+
+This hosted page auto-starts the interview by calling `POST /interview/start` with `{ sid, st, exp, sig }` (embedded-start mode) and then immediately starts the Vapi call.
 
 ---
 

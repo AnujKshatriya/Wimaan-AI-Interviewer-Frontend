@@ -8,6 +8,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import InterviewFlow from './components/InterviewFlow';
 import PageNotFound from './components/PageNotFound';
+import EmbeddedInterview from './components/EmbeddedInterview';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
       <Route path="/job_role/:jobId/:categorySlug" element={<InterviewFlow />} />
       <Route path="/job_role/:jobId" element={<InterviewFlow />} />
       <Route path="/:categorySlug" element={<InterviewFlow />} />
+      <Route path="/embed" element={<EmbeddedInterview />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
