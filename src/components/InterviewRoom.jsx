@@ -18,11 +18,27 @@ export function InterviewRoom({
   onEndCall,
   onLeave,
   onStartNewInterview,
+  isEmbedMode = false,
   candidateName,
 }) {
   const isConnected = status === CallStatus.CONNECTED;
   const isEnded = status === CallStatus.ENDED;
+  const isError = status === CallStatus.ERROR;
   const isConnecting = status === CallStatus.CONNECTING;
+
+  if (isEmbedMode && (isEnded || isError)) {
+    return (
+      <div className="min-h-screen bg-[var(--wimaan-bg)] flex flex-col">
+        <AppHeader />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-[var(--wimaan-text)] mb-3">Interview finished</h2>
+            <p className="text-[var(--wimaan-muted)]">Returning control to the app...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isEnded && finalResult) {
     return (
