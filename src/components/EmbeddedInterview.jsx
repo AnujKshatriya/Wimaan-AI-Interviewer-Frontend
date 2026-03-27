@@ -13,7 +13,6 @@ import { startEmbeddedInterview } from '../services/api';
 import { InterviewRoom } from './InterviewRoom';
 
 export function EmbeddedInterview() {
-  const isEmbedMode = true;
   const [searchParams] = useSearchParams();
   const st = searchParams.get('st') || '';
   const sid = searchParams.get('sid') || '';
@@ -38,7 +37,6 @@ export function EmbeddedInterview() {
 
   const { status, isMuted, isSpeaking, transcript, formattedDuration, finalResult, error, startCall, stopCall, toggleMute } =
     useVapi({
-      isEmbedMode: true,
       onInterviewEnded: ({ callId, endedReason, score, summary }) => {
         if (!callId || !endedReason) return;
         const payload = { callId, endedReason };
@@ -133,7 +131,6 @@ export function EmbeddedInterview() {
       onEndCall={() => stopCall()}
       onLeave={handleLeave}
       onStartNewInterview={handleStartNewInterview}
-      isEmbedMode
       candidateName={candidateName}
     />
   );

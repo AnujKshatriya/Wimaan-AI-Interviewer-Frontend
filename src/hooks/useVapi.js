@@ -50,7 +50,7 @@ function buildTranscriptString(entries) {
 }
 
 export function useVapi(options = {}) {
-  const { onInterviewEnded, isEmbedMode = false } = options;
+  const { onInterviewEnded } = options;
   const vapiRef = useRef(null);
   const [status, setStatus] = useState(CallStatus.IDLE);
   const [isMuted, setIsMuted] = useState(false);
@@ -65,15 +65,19 @@ export function useVapi(options = {}) {
   const callIdRef = useRef(null);
   const metadataRef = useRef({});
   const transcriptRef = useRef([]);
-  const finalResultRef = useRef(null);
   const submittedRef = useRef(false);
   const manualEndRequestedRef = useRef(false);
   const hasEmittedInterviewEndedRef = useRef(false);
+  const emitTimeoutRef = useRef(null);
 
   const emitInterviewEnded = useCallback(
     (reason, result) => {
       if (hasEmittedInterviewEndedRef.current) return;
       hasEmittedInterviewEndedRef.current = true;
+      if (emitTimeoutRef.current) {
+        clearTimeout(emitTimeoutRef.current);
+        emitTimeoutRef.current = null;
+      }
       if (typeof onInterviewEnded === 'function') {
         onInterviewEnded({
           callId: callIdRef.current || '',
@@ -90,10 +94,6 @@ export function useVapi(options = {}) {
   useEffect(() => {
     transcriptRef.current = transcript;
   }, [transcript]);
-
-  useEffect(() => {
-    finalResultRef.current = finalResult;
-  }, [finalResult]);
 
   // When call has ended, submit transcript to backend for evaluation (once per call)
   useEffect(() => {
@@ -138,9 +138,7 @@ export function useVapi(options = {}) {
     return () => clearTimeout(timeoutId);
   }, [status, endReason]);
 
-  // Fallback emission in case SDK terminal event callback is skipped.
   useEffect(() => {
-    if (!isEmbedMode) return;
     if (status !== CallStatus.ENDED && status !== CallStatus.ERROR) return;
     if (hasEmittedInterviewEndedRef.current) return;
 
@@ -149,8 +147,21 @@ export function useVapi(options = {}) {
       manualEndRequested: manualEndRequestedRef.current,
       hasError: status === CallStatus.ERROR,
     });
-    emitInterviewEnded(canonicalReason, finalResultRef.current);
-  }, [status, endReason, isEmbedMode, emitInterviewEnded]);
+    if (status === CallStatus.ENDED && !finalResult) {
+      emitTimeoutRef.current = setTimeout(() => {
+        emitInterviewEnded(canonicalReason, null);
+      }, 1200);
+      return () => {
+        if (emitTimeoutRef.current) {
+          clearTimeout(emitTimeoutRef.current);
+          emitTimeoutRef.current = null;
+        }
+      };
+    }
+
+    emitInterviewEnded(canonicalReason, finalResult);
+    return undefined;
+  }, [status, endReason, finalResult, emitInterviewEnded]);
 
   // Initialize VAPI client
   useEffect(() => {
@@ -185,17 +196,7 @@ export function useVapi(options = {}) {
         timerRef.current = null;
       }
 
-      const rawReason = endData?.reason || 'unknown';
-      if (isEmbedMode) {
-        const canonicalReason = normalizeEndedReasonForApp({
-          rawReason,
-          manualEndRequested: manualEndRequestedRef.current,
-          hasError: false,
-        });
-        emitInterviewEnded(canonicalReason, finalResultRef.current);
-      }
-
-      setEndReason(rawReason);
+      setEndReason(endData?.reason || 'unknown');
       setStatus(CallStatus.ENDED);
     });
 
@@ -292,26 +293,21 @@ export function useVapi(options = {}) {
       }
       
       console.error('[useVapi] Extracted error message:', errorMessage);
-      if (isEmbedMode) {
-        const canonicalReason = normalizeEndedReasonForApp({
-          rawReason: 'error',
-          manualEndRequested: manualEndRequestedRef.current,
-          hasError: true,
-        });
-        emitInterviewEnded(canonicalReason, finalResultRef.current);
-      }
       setError(errorMessage);
       setStatus(CallStatus.ERROR);
     });
 
     // Cleanup
     return () => {
+      if (emitTimeoutRef.current) {
+        clearTimeout(emitTimeoutRef.current);
+      }
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
       vapi.stop();
     };
-  }, [emitInterviewEnded, isEmbedMode]);
+  }, []);
 
   // Start call with assistant config
   const startCall = useCallback(async (assistantConfig) => {
@@ -334,6 +330,10 @@ export function useVapi(options = {}) {
       submittedRef.current = false;
       manualEndRequestedRef.current = false;
       hasEmittedInterviewEndedRef.current = false;
+      if (emitTimeoutRef.current) {
+        clearTimeout(emitTimeoutRef.current);
+        emitTimeoutRef.current = null;
+      }
 
       callIdRef.current = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `call_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
       metadataRef.current = assistantConfig?.metadata || {};
