@@ -17,6 +17,7 @@ export function InterviewRoom({
   onToggleMute,
   onEndCall,
   onLeave,
+  onStartNewInterview,
   candidateName,
 }) {
   const isConnected = status === CallStatus.CONNECTED;
@@ -59,7 +60,7 @@ export function InterviewRoom({
             </div>
 
             <button
-              onClick={onLeave}
+              onClick={onStartNewInterview || onLeave}
               className="w-full py-4 bg-[var(--wimaan-accent)] hover:bg-[var(--wimaan-accent-hover)] text-white font-semibold rounded-lg transition"
             >
               Start New Interview

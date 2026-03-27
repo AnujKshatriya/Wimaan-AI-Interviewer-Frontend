@@ -24,6 +24,22 @@ export const Speaker = {
   ASSISTANT: 'assistant',
 };
 
+function normalizeEndedReasonForApp({ rawReason, manualEndRequested, hasError }) {
+  if (hasError) return 'error';
+  if (manualEndRequested) return 'declined';
+
+  const reason = String(rawReason || '').trim().toLowerCase();
+  if (!reason) return 'error';
+
+  if (['completed', 'complete', 'success'].includes(reason)) return 'completed';
+  if (['skipped', 'skip'].includes(reason)) return 'skipped';
+  if (['declined', 'rejected', 'hang', 'end-call', 'user-ended'].includes(reason)) return 'declined';
+  if (['timeout', 'timed-out', 'no-answer', 'max-duration'].includes(reason)) return 'timeout';
+  if (['error', 'failed', 'failure'].includes(reason)) return 'error';
+
+  return 'error';
+}
+
 /** Build a single transcript string from entries for backend evaluation. */
 function buildTranscriptString(entries) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
@@ -33,7 +49,8 @@ function buildTranscriptString(entries) {
     .join('\n');
 }
 
-export function useVapi() {
+export function useVapi(options = {}) {
+  const { onInterviewEnded } = options;
   const vapiRef = useRef(null);
   const [status, setStatus] = useState(CallStatus.IDLE);
   const [isMuted, setIsMuted] = useState(false);
@@ -49,6 +66,29 @@ export function useVapi() {
   const metadataRef = useRef({});
   const transcriptRef = useRef([]);
   const submittedRef = useRef(false);
+  const manualEndRequestedRef = useRef(false);
+  const hasEmittedInterviewEndedRef = useRef(false);
+  const emitTimeoutRef = useRef(null);
+
+  const emitInterviewEnded = useCallback(
+    (reason, result) => {
+      if (hasEmittedInterviewEndedRef.current) return;
+      hasEmittedInterviewEndedRef.current = true;
+      if (emitTimeoutRef.current) {
+        clearTimeout(emitTimeoutRef.current);
+        emitTimeoutRef.current = null;
+      }
+      if (typeof onInterviewEnded === 'function') {
+        onInterviewEnded({
+          callId: callIdRef.current || '',
+          endedReason: reason,
+          score: result?.score,
+          summary: result?.summary,
+        });
+      }
+    },
+    [onInterviewEnded]
+  );
 
   // Keep transcriptRef in sync so we read latest transcript when call ends
   useEffect(() => {
@@ -97,6 +137,32 @@ export function useVapi() {
 
     return () => clearTimeout(timeoutId);
   }, [status, endReason]);
+
+  useEffect(() => {
+    if (status !== CallStatus.ENDED && status !== CallStatus.ERROR) return;
+    if (hasEmittedInterviewEndedRef.current) return;
+
+    const canonicalReason = normalizeEndedReasonForApp({
+      rawReason: endReason,
+      manualEndRequested: manualEndRequestedRef.current,
+      hasError: status === CallStatus.ERROR,
+    });
+
+    if (status === CallStatus.ENDED && !finalResult) {
+      emitTimeoutRef.current = setTimeout(() => {
+        emitInterviewEnded(canonicalReason, null);
+      }, 1200);
+      return () => {
+        if (emitTimeoutRef.current) {
+          clearTimeout(emitTimeoutRef.current);
+          emitTimeoutRef.current = null;
+        }
+      };
+    }
+
+    emitInterviewEnded(canonicalReason, finalResult);
+    return undefined;
+  }, [status, endReason, finalResult, emitInterviewEnded]);
 
   // Initialize VAPI client
   useEffect(() => {
@@ -234,6 +300,9 @@ export function useVapi() {
 
     // Cleanup
     return () => {
+      if (emitTimeoutRef.current) {
+        clearTimeout(emitTimeoutRef.current);
+      }
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
@@ -260,6 +329,12 @@ export function useVapi() {
       setEndReason(null);
       hasReceivedScoreRef.current = false;
       submittedRef.current = false;
+      manualEndRequestedRef.current = false;
+      hasEmittedInterviewEndedRef.current = false;
+      if (emitTimeoutRef.current) {
+        clearTimeout(emitTimeoutRef.current);
+        emitTimeoutRef.current = null;
+      }
 
       callIdRef.current = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `call_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
       metadataRef.current = assistantConfig?.metadata || {};
@@ -283,6 +358,7 @@ export function useVapi() {
 
   // Stop call
   const stopCall = useCallback(() => {
+    manualEndRequestedRef.current = true;
     if (vapiRef.current) {
       vapiRef.current.stop();
     }

@@ -50,7 +50,7 @@ export async function startInterview({ name, phone, category, module, jd_id }) {
 
 /**
  * Start an embedded interview (skip login/setup) for the hosted WebView page.
- * Calls POST /interview/start with embedded-start token set: { sid, st, exp, sig }.
+ * Calls POST /interview/mobile/start with embedded-start token set: { sid, st, exp, sig }.
  * @param {Object} params
  * @param {string} params.sid
  * @param {string} params.st - Signed JWT token
@@ -67,7 +67,10 @@ export async function startEmbeddedInterview({ sid, st, exp, sig }) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `HTTP ${response.status}: Failed to start embedded interview`);
+    const message = error.error || `HTTP ${response.status}: Failed to start embedded interview`;
+    const err = new Error(message);
+    err.code = error.code || 'EMBEDDED_START_FAILED';
+    throw err;
   }
 
   const data = await response.json();
