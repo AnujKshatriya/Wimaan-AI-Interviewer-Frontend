@@ -90,6 +90,45 @@ export async function startEmbeddedInterview({ sid, st, exp, sig }) {
  * @param {string} [params.endedReason] - Why the call ended
  * @returns {Promise<{ score: number, summary: string }>}
  */
+/**
+ * Register a Vapi call_id in interview_results when the call connects (server source of truth for later submit).
+ */
+export async function registerInterviewCall({ callId, name, phone, category, module, jd_id }) {
+  const body = { callId, name: name || '', phone: phone || '' };
+  if (category != null) body.category = category;
+  if (module != null) body.module = module;
+  if (jd_id) body.jd_id = jd_id;
+
+  const response = await fetch(`${API_BASE}/interview/register-call`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `HTTP ${response.status}: Failed to register call`);
+  }
+  return response.json();
+}
+
+/**
+ * Persist transcript for a call_id before submit (e.g. at call-end).
+ */
+export async function syncInterviewTranscript({ callId, transcript }) {
+  const response = await fetch(`${API_BASE}/interview/sync-transcript`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callId, transcript: transcript || '' }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `HTTP ${response.status}: Failed to sync transcript`);
+  }
+  return response.json();
+}
+
 export async function submitInterviewResult({ callId, name, phone, category, module, jd_id, transcript, endedReason }) {
   const body = {
     callId,
@@ -119,5 +158,7 @@ export async function submitInterviewResult({ callId, name, phone, category, mod
 export default {
   startInterview,
   startEmbeddedInterview,
+  registerInterviewCall,
+  syncInterviewTranscript,
   submitInterviewResult,
 };

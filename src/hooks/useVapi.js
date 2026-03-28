@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Vapi from '@vapi-ai/web';
-import { submitInterviewResult } from '../services/api.js';
+import { registerInterviewCall, syncInterviewTranscript, submitInterviewResult } from '../services/api.js';
 
 const VAPI_PUBLIC_KEY = import.meta.env.VITE_VAPI_PUBLIC_KEY;
 
@@ -166,7 +166,7 @@ export function useVapi(options = {}) {
     console.log('[useVapi] VAPI client initialized successfully');
 
     // Event listeners
-    vapi.on('call-start', () => {
+    vapi.on('call-start', async () => {
       console.log('[useVapi] EVENT: call-start - Call connected!');
       setStatus(CallStatus.CONNECTED);
       setError(null);
@@ -174,14 +174,41 @@ export function useVapi(options = {}) {
       timerRef.current = setInterval(() => {
         setCallDuration((prev) => prev + 1);
       }, 1000);
+
+      const cid = callIdRef.current;
+      const meta = metadataRef.current;
+      if (cid && meta?.phone) {
+        try {
+          await registerInterviewCall({
+            callId: cid,
+            name: meta.name ?? '',
+            phone: String(meta.phone ?? ''),
+            category: meta.category ?? '',
+            module: meta.module ?? '',
+            jd_id: meta.jdId || undefined,
+          });
+        } catch (e) {
+          console.error('[useVapi] registerInterviewCall failed:', e?.message || e);
+        }
+      }
     });
 
-    vapi.on('call-end', (endData) => { 
+    vapi.on('call-end', async (endData) => {
       console.log('[useVapi] EVENT: call-end - Call ended', endData);
-      
+
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+      }
+
+      const cid = callIdRef.current;
+      const text = buildTranscriptString(transcriptRef.current);
+      if (cid) {
+        try {
+          await syncInterviewTranscript({ callId: cid, transcript: text });
+        } catch (e) {
+          console.error('[useVapi] syncInterviewTranscript failed:', e?.message || e);
+        }
       }
 
       setEndReason(endData?.reason || 'unknown');
